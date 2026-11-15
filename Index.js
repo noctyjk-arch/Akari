@@ -171,7 +171,7 @@ function montarMenu() {
         .setTitle("📌 MENU")
         .setColor(COR)
         .addFields(
-            { name: "🤖 SISTEMA", value: "`!menu` • `!ping` • `!status` • `!restart`" },
+            { name: "💻 SISTEMA", value: "`!menu` • `!ping` • `!status` • `!restart`" },
             { name: "🛡️ GERENCIAMENTO DE MEMBROS", value: "`!ban` • `!unban` • `!kick`\n`!mute` • `!unmute`\n`!nick` • `!limparapelido`\n`!avatar` • `!userinfo` • `!roleinfo`" },
             { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo` • `!editarnomecargo`\n`!corcargo` • `!adicionarperm` • `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
             { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz` • `!apagarcanal`\n`!renomearcanal` • `!topico`\n`!trancar` • `!destrancar`\n`!slowmode` • `!nsfw`" },
