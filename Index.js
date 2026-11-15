@@ -165,13 +165,18 @@ async function aplicarProtecoes(message) {
     return false;
 }
 
-// Painel de comandos (mesmo layout da imagem)
-function montarMenu() {
-    return new EmbedBuilder()
-        .setTitle("📌 MENU")
+// Painel de comandos ;P
+function montarMenu(guild) {
+    const embed = new EmbedBuilder()
+        .setTitle("✦ PAINEL DE COMANDOS")
+        .setDescription(
+            "Bem-vindo ao painel de administração!\n\n" +
+            "Aqui estão os comandos disponíveis no servidor.\n" +
+            "Use o prefixo `!` antes de cada comando."
+        )
         .setColor(COR)
         .addFields(
-            { name: "💻 SISTEMA", value: "`!menu` • `!ping` • `!status` • `!restart`" },
+            { name: "🤖 SISTEMA", value: "`!menu` • `!ping` • `!status` • `!restart`" },
             { name: "🛡️ GERENCIAMENTO DE MEMBROS", value: "`!ban` • `!unban` • `!kick`\n`!mute` • `!unmute`\n`!nick` • `!limparapelido`\n`!avatar` • `!userinfo` • `!roleinfo`" },
             { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo` • `!editarnomecargo`\n`!corcargo` • `!adicionarperm` • `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
             { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz` • `!apagarcanal`\n`!renomearcanal` • `!topico`\n`!trancar` • `!destrancar`\n`!slowmode` • `!nsfw`" },
@@ -182,6 +187,11 @@ function montarMenu() {
         )
         .setFooter({ text: "Bot de Administração • Painel de comandos" })
         .setTimestamp();
+
+    // Miniatura = ícone do servidor (muda sozinha se o ícone do servidor mudar)
+    const icone = guild?.iconURL({ size: 256 });
+    if (icone) embed.setThumbnail(icone);
+    return embed;
 }
 
 const comandos = {
