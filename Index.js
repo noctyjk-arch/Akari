@@ -767,13 +767,3 @@ client.on("messageCreate", async message => {
 client.login(process.env.TOKEN);
 
 require("http").createServer(() => {}).listen(process.env.PORT || 3000);
-  await comandos[cmd](message, args, resto);
-    } catch (err) {
-        addLog("[CRASH] " + err.message);
-        message.reply("Erro interno.").catch(() => {});
-    }
-});
-
-client.login(process.env.TOKEN);
-
-require("http").createServer(() => {}).listen(process.env.PORT || 3000);
