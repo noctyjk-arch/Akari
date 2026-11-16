@@ -263,14 +263,14 @@ function montarMenu(guild) {
         )
         .setColor(COR)
         .addFields(
-            { name: "💻 SISTEMA", value: "`!menu` • `!ping` • `!status` •  `!restart`" },
-            { name: "🛡️ GERENCIAMENTO DE MEMBROS", value: "`!ban` • `!unban` • `!kick`\n`!mute` • `!unmute`\n`!nick` • `!limparapelido`\n`!avatar` • `!userinfo` • `!roleinfo`" },
-            { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo` •  `!editarnomecargo`\n`!corcargo` • `!adicionarperm` •  `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
-            { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz` •  `!apagarcanal`\n`!renomearcanal` • `!topico`\n`!trancar` • `!destrancar`\n`!slowmode` • `!nsfw`" },
-            { name: "💬 GERENCIAMENTO DE MENSAGENS", value: "`!limpar` • `!limparuser`\n`!fixar` • `!desafixar`\n`!anunciar` • `!embed` • `!say` •  `!reagir`" },
-            { name: "⚙️ ADMINISTRAÇÃO DO SERVIDOR", value: "`!servidor` • `!iconserver` •  `!nomeServer` • `!banner`\n`!invites` • `!criaconvite` •  `!deletaconvite`\n`!lockserver` • `!unlockserver`" },
-            { name: "🔰 PROTEÇÃO E AUDITORIA", value: "`!logs` • `!antispam` • `!antiraid` •  `!antiinvite`\n`!warn` • `!warnings` • `!clearwarn`\n`!lockdown`" },
-            { name: "🔎 PESQUISAS", value: "`!google` • `!imagens` • `!videos`\n`!noticias` • `!maps` • `!youtube`" },
+            { name: "💻 SISTEMA", value: "`!menu` • `!ping`\n`!status` • `!restart`" },
+            { name: "🛡️ GERENCIAMENTO DE MEMBROS", value: "`!ban` • `!unban`\n`!kick` • `!mute`\n`!unmute` • `!nick`\n`!limparapelido` • `!avatar`\n`!userinfo` • `!roleinfo`" },
+            { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo`\n`!editarnomecargo` • `!corcargo`\n`!adicionarperm` • `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
+            { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz`\n`!apagarcanal` • `!renomearcanal`\n`!topico` • `!trancar`\n`!destrancar` • `!slowmode`\n`!nsfw`" },
+            { name: "💬 GERENCIAMENTO DE MENSAGENS", value: "`!limpar` • `!limparuser`\n`!fixar` • `!desafixar`\n`!anunciar` • `!embed`\n`!say` • `!reagir`" },
+            { name: "⚙️ ADMINISTRAÇÃO DO SERVIDOR", value: "`!servidor` • `!iconserver`\n`!nomeServer` • `!banner`\n`!invites` • `!criaconvite`\n`!deletaconvite` • `!lockserver`\n`!unlockserver`" },
+            { name: "🔰 PROTEÇÃO E AUDITORIA", value: "`!logs` • `!antispam`\n`!antiraid` • `!antiinvite`\n`!warn` • `!warnings`\n`!clearwarn` • `!lockdown`" },
+            { name: "🔎 PESQUISAS", value: "`!google` • `!imagens`\n`!videos` • `!noticias`\n`!maps` • `!youtube`" },
             { name: "🎉 EXTRAS", value: "`!ajuda` • `!lembrete`\n`!enquete` • `!sorteio`" }
         )
         .setFooter({ text: "Bot de Administração • Painel de comandos" })
@@ -903,6 +903,14 @@ client.on("guildMemberAdd", async membro => {
             await membro.kick("Lockdown ativo").catch(() => {});
             addLog(`[LOCKDOWN] ${membro.user.tag} expulso ao entrar`);
         }
+
+        // Boas-vindas no canal "bem-vindo" (também acha o nome escrito em fonte estilizada)
+        if (!cfg.lockdown) {
+            const canal = membro.guild.channels.cache.find(c =>
+                c.type === ChannelType.GuildText && c.name.normalize("NFKC").toLowerCase() === "bem-vindo"
+            );
+            if (canal) await canal.send(`👋 Bem-vindo(a) ao servidor, ${membro}!`).catch(() => {});
+        }
     } catch (err) {
         addLog("[ERRO] " + err.message);
     }
@@ -939,10 +947,10 @@ client.on("messageCreate", async message => {
     }
 });
 
+const PORT = Number(process.env.SERVER_PORT || process.env.PORT || 3000);
+require("http").createServer((_, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("ok");
+}).listen(PORT, "0.0.0.0");
+
 client.login(process.env.TOKEN);
-
-require("http").createServer(() => {}).listen(process.env.PORT || 3000);
-
-client.login(process.env.TOKEN);
-
-require("http").createServer(() => {}).listen(process.env.PORT || 3000);
