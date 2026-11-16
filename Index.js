@@ -24,7 +24,8 @@ const COR_AVISO = 0xf1c40f;
 const PUBLICOS = new Set([
     "menu", "ia", "ping", "status",
     "avatar", "userinfo", "roleinfo", "infocargo", "listarcargos", "servidor",
-    "google", "imagens", "videos", "noticias", "maps", "youtube"
+    "google", "imagens", "videos", "noticias", "maps", "youtube",
+    "ajuda", "lembrete"
 ]);
 
 // Limites das proteções automáticas
@@ -133,6 +134,92 @@ const pesquisa = (cmd, icone, nome, base) => async (message, args, resto) => {
     return message.reply({ embeds: [embed] });
 };
 
+// "10m", "2h", "1d", "30s" -> duração em milissegundos (ou null se inválido)
+function parseDuracao(texto) {
+    const m = /^(\d+)\s*(s|seg|segundos?|m|min|minutos?|h|horas?|d|dias?)$/i.exec((texto || "").trim());
+    if (!m) return null;
+    const valor = parseInt(m[1], 10);
+    const unidade = m[2][0].toLowerCase();
+    const multiplicadores = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+    return valor * multiplicadores[unidade];
+}
+
+// Emojis numerados usados pela !enquete
+const NUMEROS = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
+
+// Uso e descrição de cada comando, usado pela !ajuda
+const AJUDA = {
+    menu: ["menu", "Mostra o painel com todos os comandos."],
+    ia: ["ia", "Comando reservado (atualmente indisponível)."],
+    ping: ["ping", "Mostra a latência do bot e da API do Discord."],
+    status: ["status", "Mostra se o bot está online, o ping e o tempo ligado."],
+    restart: ["restart", "Reinicia o bot. (dono)"],
+    ban: ["ban @usuário [motivo]", "Bane um usuário do servidor. (dono)"],
+    unban: ["unban <id>", "Remove o banimento de um usuário pelo ID. (dono)"],
+    kick: ["kick @usuário [motivo]", "Expulsa um usuário do servidor. (dono)"],
+    mute: ["mute @usuário [minutos]", "Silencia (timeout) um usuário por um tempo. (dono)"],
+    unmute: ["unmute @usuário", "Remove o silêncio (timeout) de um usuário. (dono)"],
+    nick: ["nick @usuário novo apelido", "Troca o apelido de um usuário. (dono)"],
+    limparapelido: ["limparapelido @usuário", "Remove o apelido de um usuário. (dono)"],
+    avatar: ["avatar [@usuário]", "Mostra o avatar de um usuário (ou o seu)."],
+    userinfo: ["userinfo [@usuário]", "Mostra informações de um usuário (ou de você)."],
+    roleinfo: ["roleinfo [@usuário]", "Lista os cargos de um usuário (ou os seus)."],
+    criarcargo: ["criarcargo <nome> [#cor]", "Cria um novo cargo no servidor. (dono)"],
+    excluircargo: ["excluircargo @cargo", "Exclui um cargo do servidor. (dono)"],
+    editarnomecargo: ["editarnomecargo @cargo novo nome", "Renomeia um cargo. (dono)"],
+    corcargo: ["corcargo @cargo #RRGGBB", "Troca a cor de um cargo. (dono)"],
+    adicionarperm: ["adicionarperm @cargo Permissão", "Adiciona uma permissão a um cargo. (dono)"],
+    removerperm: ["removerperm @cargo Permissão", "Remove uma permissão de um cargo. (dono)"],
+    darcargo: ["darcargo @usuário @cargo", "Dá um cargo a um usuário. (dono)"],
+    retirarcargo: ["retirarcargo @usuário @cargo", "Remove um cargo de um usuário. (dono)"],
+    listarcargos: ["listarcargos", "Lista todos os cargos do servidor."],
+    infocargo: ["infocargo @cargo", "Mostra detalhes de um cargo."],
+    criarcanal: ["criarcanal <nome>", "Cria um canal de texto. (dono)"],
+    criarvoz: ["criarvoz <nome>", "Cria um canal de voz. (dono)"],
+    apagarcanal: ["apagarcanal [#canal]", "Apaga um canal (o atual, se não citar outro). (dono)"],
+    renomearcanal: ["renomearcanal #canal novo-nome", "Renomeia um canal. (dono)"],
+    topico: ["topico <texto>", "Define o tópico do canal atual. (dono)"],
+    trancar: ["trancar", "Impede @everyone de enviar mensagens no canal atual. (dono)"],
+    destrancar: ["destrancar", "Libera @everyone para enviar mensagens no canal atual. (dono)"],
+    slowmode: ["slowmode <0 a 21600>", "Define o modo lento do canal, em segundos. (dono)"],
+    nsfw: ["nsfw", "Ativa ou desativa a marcação NSFW do canal atual. (dono)"],
+    limpar: ["limpar <1 a 100>", "Apaga uma quantidade de mensagens do canal. (dono)"],
+    limparuser: ["limparuser @usuário [quantidade]", "Apaga mensagens recentes de um usuário. (dono)"],
+    fixar: ["fixar (respondendo) ou fixar <id>", "Fixa uma mensagem no canal. (dono)"],
+    desafixar: ["desafixar (respondendo) ou desafixar <id>", "Remove a fixação de uma mensagem. (dono)"],
+    anunciar: ["anunciar [#canal] texto", "Envia um anúncio em embed. (dono)"],
+    embed: ["embed Título | Descrição", "Envia uma mensagem em embed. (dono)"],
+    say: ["say texto", "Faz o bot repetir o texto enviado. (dono)"],
+    reagir: ["reagir <emoji> (respondendo) ou reagir <id> <emoji>", "Reage com um emoji em uma mensagem. (dono)"],
+    servidor: ["servidor", "Mostra informações do servidor."],
+    iconserver: ["iconserver (anexe uma imagem ou link)", "Troca o ícone do servidor. (dono)"],
+    nomeserver: ["nomeServer novo nome", "Troca o nome do servidor. (dono)"],
+    banner: ["banner (anexe uma imagem ou link)", "Troca o banner do servidor (precisa de boost nível 2). (dono)"],
+    invites: ["invites", "Lista os convites ativos do servidor. (dono)"],
+    criaconvite: ["criaconvite [usos]", "Cria um convite para o canal atual. (dono)"],
+    deletaconvite: ["deletaconvite <código ou link>", "Apaga um convite do servidor. (dono)"],
+    lockserver: ["lockserver", "Trava todos os canais de texto do servidor. (dono)"],
+    unlockserver: ["unlockserver", "Destrava todos os canais de texto do servidor. (dono)"],
+    logs: ["logs", "Mostra as últimas ações registradas pelo bot. (dono)"],
+    antispam: ["antispam [on|off]", "Liga/desliga a proteção automática contra spam. (dono)"],
+    antiraid: ["antiraid [on|off]", "Liga/desliga a proteção automática contra raid. (dono)"],
+    antiinvite: ["antiinvite [on|off]", "Liga/desliga o bloqueio automático de convites. (dono)"],
+    lockdown: ["lockdown on|off", "Ativa/desativa o modo lockdown do servidor. (dono)"],
+    warn: ["warn @usuário [motivo]", "Dá um aviso a um usuário. (dono)"],
+    warnings: ["warnings @usuário", "Mostra os avisos de um usuário. (dono)"],
+    clearwarn: ["clearwarn @usuário", "Limpa os avisos de um usuário. (dono)"],
+    google: ["google <termo>", "Pesquisa um termo no Google."],
+    imagens: ["imagens <termo>", "Pesquisa imagens no Google."],
+    videos: ["videos <termo>", "Pesquisa vídeos no Google."],
+    noticias: ["noticias <termo>", "Pesquisa notícias no Google."],
+    maps: ["maps <termo>", "Pesquisa um local no Google Maps."],
+    youtube: ["youtube <termo>", "Pesquisa um vídeo no YouTube."],
+    ajuda: ["ajuda <comando>", "Mostra o uso e a explicação de um comando."],
+    lembrete: ["lembrete <tempo ex: 10m> <texto>", "Avisa você mesmo depois do tempo informado (ex: 30s, 10m, 2h, 1d)."],
+    enquete: ["enquete pergunta | opção 1 | opção 2 [| ...]", "Cria uma votação com reações numeradas (até 10 opções). (dono)"],
+    sorteio: ["sorteio (respondendo) [emoji] ou sorteio <id> [emoji]", "Sorteia um vencedor entre quem reagiu a uma mensagem. (dono)"],
+};
+
 // Proteções automáticas, rodam antes dos comandos. Retorna true se barrou a mensagem.
 async function aplicarProtecoes(message) {
     if (isento(message)) return false;
@@ -176,14 +263,15 @@ function montarMenu(guild) {
         )
         .setColor(COR)
         .addFields(
-            { name: "💻 SISTEMA", value: "`!menu` • `!ping` • `!status` • `!restart`" },
+            { name: "💻 SISTEMA", value: "`!menu` • `!ping` • `!status` •  `!restart`" },
             { name: "🛡️ GERENCIAMENTO DE MEMBROS", value: "`!ban` • `!unban` • `!kick`\n`!mute` • `!unmute`\n`!nick` • `!limparapelido`\n`!avatar` • `!userinfo` • `!roleinfo`" },
-            { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo` • `!editarnomecargo`\n`!corcargo` • `!adicionarperm` • `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
-            { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz` • `!apagarcanal`\n`!renomearcanal` • `!topico`\n`!trancar` • `!destrancar`\n`!slowmode` • `!nsfw`" },
-            { name: "💬 GERENCIAMENTO DE MENSAGENS", value: "`!limpar` • `!limparuser`\n`!fixar` • `!desafixar`\n`!anunciar` • `!embed` • `!say` • `!reagir`" },
-            { name: "⚙️ ADMINISTRAÇÃO DO SERVIDOR", value: "`!servidor` • `!iconserver` • `!nomeServer` • `!banner`\n`!invites` • `!criaconvite` • `!deletaconvite`\n`!lockserver` • `!unlockserver`" },
-            { name: "🔰 PROTEÇÃO E AUDITORIA", value: "`!logs` • `!antispam` • `!antiraid` • `!antiinvite`\n`!warn` • `!warnings` • `!clearwarn`\n`!lockdown`" },
-            { name: "🔎 PESQUISAS", value: "`!google` • `!imagens` • `!videos`\n`!noticias` • `!maps` • `!youtube`" }
+            { name: "🎭 GERENCIAMENTO DE CARGOS", value: "`!criarcargo` • `!excluircargo` •  `!editarnomecargo`\n`!corcargo` • `!adicionarperm` •  `!removerperm`\n`!darcargo` • `!retirarcargo`\n`!listarcargos` • `!infocargo`" },
+            { name: "📁 GERENCIAMENTO DE CANAIS", value: "`!criarcanal` • `!criarvoz` •  `!apagarcanal`\n`!renomearcanal` • `!topico`\n`!trancar` • `!destrancar`\n`!slowmode` • `!nsfw`" },
+            { name: "💬 GERENCIAMENTO DE MENSAGENS", value: "`!limpar` • `!limparuser`\n`!fixar` • `!desafixar`\n`!anunciar` • `!embed` • `!say` •  `!reagir`" },
+            { name: "⚙️ ADMINISTRAÇÃO DO SERVIDOR", value: "`!servidor` • `!iconserver` •  `!nomeServer` • `!banner`\n`!invites` • `!criaconvite` •  `!deletaconvite`\n`!lockserver` • `!unlockserver`" },
+            { name: "🔰 PROTEÇÃO E AUDITORIA", value: "`!logs` • `!antispam` • `!antiraid` •  `!antiinvite`\n`!warn` • `!warnings` • `!clearwarn`\n`!lockdown`" },
+            { name: "🔎 PESQUISAS", value: "`!google` • `!imagens` • `!videos`\n`!noticias` • `!maps` • `!youtube`" },
+            { name: "🎉 EXTRAS", value: "`!ajuda` • `!lembrete`\n`!enquete` • `!sorteio`" }
         )
         .setFooter({ text: "Bot de Administração • Painel de comandos" })
         .setTimestamp();
@@ -196,7 +284,7 @@ function montarMenu(guild) {
 
 const comandos = {
     // ===== Sistema =====
-    menu: message => message.reply({ embeds: [montarMenu()] }),
+    menu: message => message.reply({ embeds: [montarMenu(message.guild ?? client.guilds.cache.get(message.guildId))] }),
 
     ia: message => message.reply("Comando indisponível."),
 
@@ -714,6 +802,83 @@ const comandos = {
     noticias: pesquisa("noticias", "📰", "Notícias", "https://www.google.com/search?tbm=nws&q="),
     maps: pesquisa("maps", "🗺️", "Maps", "https://www.google.com/maps/search/?api=1&query="),
     youtube: pesquisa("youtube", "▶️", "YouTube", "https://www.youtube.com/results?search_query="),
+
+    // ===== Ajuda, lembretes, enquetes e sorteios =====
+    ajuda: (message, args) => {
+        const nome = (args[0] || "").toLowerCase();
+        if (!nome) return uso(message, "ajuda <comando>");
+        const info = AJUDA[nome];
+        if (!info) return message.reply(`❌ Comando \`${nome}\` não existe. Use \`!menu\` para ver a lista.`);
+        const [usoTxt, descricao] = info;
+        const embed = new EmbedBuilder()
+            .setTitle(`❔ Ajuda: !${nome}`)
+            .setDescription(descricao)
+            .addFields({ name: "Uso", value: `\`${PREFIX}${usoTxt}\`` })
+            .setColor(COR);
+        return message.reply({ embeds: [embed] });
+    },
+
+    lembrete: (message, args, resto) => {
+        const duracaoMs = parseDuracao(args[0]);
+        if (!duracaoMs) return uso(message, "lembrete <tempo ex: 10m> <texto>");
+        if (duracaoMs < 5000 || duracaoMs > 7 * 86400000) {
+            return message.reply("⏱️ Use um tempo entre 5 segundos e 7 dias (ex: 30s, 10m, 2h, 1d).");
+        }
+        const texto = resto.slice(args[0].length).trim();
+        if (!texto) return uso(message, "lembrete <tempo ex: 10m> <texto>");
+
+        const canal = message.channel;
+        const autor = message.author;
+        setTimeout(() => {
+            canal.send(`⏰ ${autor}, lembrete: ${texto}`).catch(() => {});
+        }, duracaoMs);
+
+        return message.reply(`⏱️ Lembrete criado! Vou te avisar em **${args[0]}**: "${texto}"`);
+    },
+
+    enquete: async (message, args, resto) => {
+        const partes = resto.split("|").map(p => p.trim()).filter(Boolean);
+        const [pergunta, ...opcoes] = partes;
+        if (!pergunta || opcoes.length < 2) return uso(message, "enquete pergunta | opção 1 | opção 2 [| ...]");
+        if (opcoes.length > NUMEROS.length) return message.reply(`❌ Máximo de ${NUMEROS.length} opções.`);
+
+        const linhas = opcoes.map((op, i) => `${NUMEROS[i]} ${op}`);
+        const embed = new EmbedBuilder()
+            .setTitle("🗳️ Enquete")
+            .setDescription(`**${pergunta}**\n\n${linhas.join("\n")}`)
+            .setColor(COR)
+            .setFooter({ text: `Por ${message.author.tag}` })
+            .setTimestamp();
+
+        await message.delete().catch(() => {});
+        const enviada = await message.channel.send({ embeds: [embed] });
+        for (let i = 0; i < opcoes.length; i++) {
+            await enviada.react(NUMEROS[i]);
+        }
+    },
+
+    sorteio: async (message, args) => {
+        const respondendo = message.reference?.messageId;
+        const alvoId = respondendo || args[0];
+        const emoji = respondendo ? args[0] : args[1];
+        if (!alvoId) return uso(message, "sorteio (respondendo uma mensagem) [emoji] ou sorteio <id> [emoji]");
+
+        const alvo = await message.channel.messages.fetch(alvoId).catch(() => null);
+        if (!alvo) return temp(message.channel, "Mensagem não encontrada.");
+
+        let reacao = emoji
+            ? alvo.reactions.cache.get(emoji) ||
+              alvo.reactions.cache.find(r => r.emoji.name === emoji || r.emoji.toString() === emoji)
+            : alvo.reactions.cache.first();
+        if (!reacao) return message.reply("Essa mensagem não tem reações" + (emoji ? ` com o emoji ${emoji}.` : "."));
+
+        const usuarios = (await reacao.users.fetch()).filter(u => !u.bot);
+        if (!usuarios.size) return message.reply("Ninguém reagiu (sem contar bots).");
+
+        const vencedor = usuarios.random();
+        addLog(`[SORTEIO] vencedor ${vencedor.tag}`);
+        return message.reply(`🎉 Parabéns ${vencedor}! Você ganhou o sorteio.`);
+    },
 };
 
 client.on("ready", () => {
@@ -773,6 +938,10 @@ client.on("messageCreate", async message => {
         message.reply("Erro interno.").catch(() => {});
     }
 });
+
+client.login(process.env.TOKEN);
+
+require("http").createServer(() => {}).listen(process.env.PORT || 3000);
 
 client.login(process.env.TOKEN);
 
