@@ -26,7 +26,6 @@ const PUBLICOS = new Set([
     "avatar", "userinfo", "roleinfo", "infocargo", "listarcargos", "servidor",
     "google", "imagens", "videos", "noticias", "maps", "youtube",
     "ajuda", "lembrete",
-    "saldo", "daily", "transferir", "loja", "comprar", "rank",
     "porcentagem", "ship", "8ball", "ticket"
 ]);
 
@@ -41,11 +40,6 @@ const configs = new Map();           // guildId -> { antispam, antiraid, antiinv
 const avisos = new Map();            // "guildId:userId" -> [{ motivo, por, data }]
 const msgsRecentes = new Map();      // "guildId:userId" -> [timestamps]
 const entradasRecentes = new Map();  // guildId -> [timestamps]
-const moedas = new Map();            // "guildId:userId" -> saldo em 💶
-const ultimoGanho = new Map();       // "guildId:userId" -> última vez que ganhou 💶 por conversar
-const ultimoDaily = new Map();       // "guildId:userId" -> última vez que pegou o !daily
-const mensagensCount = new Map();    // "guildId:userId" -> total de mensagens (para o !rank)
-const lojas = new Map();             // guildId -> Map(roleId -> preço)
 const autoCargos = new Map();        // guildId -> roleId dado a quem entra
 const filtros = new Map();           // guildId -> Set de palavras proibidas
 
@@ -227,14 +221,6 @@ const AJUDA = {
     lembrete: ["lembrete <tempo ex: 10m> <texto>", "Avisa você mesmo depois do tempo informado (ex: 30s, 10m, 2h, 1d)."],
     enquete: ["enquete pergunta | opção 1 | opção 2 [| ...]", "Cria uma votação com reações numeradas (até 10 opções). (dono)"],
     sorteio: ["sorteio (respondendo) [emoji] ou sorteio <id> [emoji]", "Sorteia um vencedor entre quem reagiu a uma mensagem. (dono)"],
-    saldo: ["saldo [@usuário]", "Mostra quantas moedas 💶 você (ou alguém) tem."],
-    daily: ["daily", "Pega 100 💶 uma vez a cada 24 horas."],
-    transferir: ["transferir @usuário valor", "Envia moedas 💶 para outra pessoa."],
-    loja: ["loja", "Mostra os cargos à venda e o preço de cada um."],
-    comprar: ["comprar @cargo", "Compra um cargo da loja usando moedas 💶."],
-    addloja: ["addloja @cargo preço", "Coloca um cargo à venda na loja. (dono)"],
-    removeloja: ["removeloja @cargo", "Tira um cargo da loja. (dono)"],
-    rank: ["rank [moedas]", "Mostra o top 10 de mensagens (ou de moedas, com 'moedas')."],
     autocargo: ["autocargo @cargo | autocargo off", "Define o cargo que quem entrar no servidor recebe. (dono)"],
     porcentagem: ["porcentagem <algo>", "Diz uma porcentagem aleatória para qualquer coisa."],
     ship: ["ship @usuário1 @usuário2", "Mostra a compatibilidade (em %) entre duas pessoas."],
@@ -285,37 +271,12 @@ async function aplicarProtecoes(message) {
     return false;
 }
 
-// ===== Economia, ranking e filtro =====
-
-const chaveUser = (guildId, userId) => `${guildId}:${userId}`;
-
-const moedasDe = (guildId, userId) => moedas.get(chaveUser(guildId, userId)) || 0;
-
-function alterarMoedas(guildId, userId, delta) {
-    const chave = chaveUser(guildId, userId);
-    moedas.set(chave, (moedas.get(chave) || 0) + delta);
-}
-
-const lojaDe = guildId => {
-    if (!lojas.has(guildId)) lojas.set(guildId, new Map());
-    return lojas.get(guildId);
-};
+// ===== Filtro de palavras =====
 
 const filtroDe = guildId => {
     if (!filtros.has(guildId)) filtros.set(guildId, new Set());
     return filtros.get(guildId);
 };
-
-// Conta a mensagem para o !rank e dá de 1 a 3 💶 por conversar (no máximo uma vez a cada 60s)
-function contarAtividade(message) {
-    const chave = chaveUser(message.guild.id, message.author.id);
-    mensagensCount.set(chave, (mensagensCount.get(chave) || 0) + 1);
-    if (message.content.startsWith(PREFIX)) return;
-    const agora = Date.now();
-    if (agora - (ultimoGanho.get(chave) || 0) < 60000) return;
-    ultimoGanho.set(chave, agora);
-    alterarMoedas(message.guild.id, message.author.id, 1 + Math.floor(Math.random() * 3));
-}
 
 // Painel de comandos ;P
 function montarMenu(guild) {
@@ -336,8 +297,6 @@ function montarMenu(guild) {
             { name: "⚙️ ADMINISTRAÇÃO DO SERVIDOR", value: "`!servidor` • `!iconserver`\n`!nomeServer` • `!banner`\n`!invites` • `!criaconvite`\n`!deletaconvite` • `!lockserver`\n`!unlockserver`" },
             { name: "🔰 PROTEÇÃO E AUDITORIA", value: "`!logs` • `!antispam`\n`!antiraid` • `!antiinvite`\n`!warn` • `!warnings`\n`!clearwarn` • `!lockdown`\n`!filtro`" },
             { name: "🔎 PESQUISAS", value: "`!google` • `!imagens`\n`!videos` • `!noticias`\n`!maps` • `!youtube`" },
-            { name: "💶 ECONOMIA", value: "`!saldo` • `!daily`\n`!transferir` • `!loja`\n`!comprar` • `!addloja`\n`!removeloja`" },
-            { name: "🏆 RANKING", value: "`!rank` • `!rank moedas`" },
             { name: "🎲 DIVERSÃO", value: "`!porcentagem` • `!ship`\n`!8ball`" },
             { name: "🎉 EXTRAS", value: "`!ajuda` • `!lembrete`\n`!enquete` • `!sorteio`\n`!ticket`" }
         )
@@ -947,109 +906,6 @@ const comandos = {
         addLog(`[SORTEIO] vencedor ${vencedor.tag}`);
         return message.reply(`🎉 Parabéns ${vencedor}! Você ganhou o sorteio.`);
     },
-    // ===== Economia =====
-    saldo: message => {
-        const alvo = message.mentions.users.first() || message.author;
-        return message.reply(`💶 ${alvo.username} tem **${moedasDe(message.guild.id, alvo.id)}** moedas.`);
-    },
-
-    daily: message => {
-        const chave = chaveUser(message.guild.id, message.author.id);
-        const agora = Date.now();
-        const ultimo = ultimoDaily.get(chave);
-        if (ultimo !== undefined && agora - ultimo < 86400000) {
-            const minutos = Math.ceil((86400000 - (agora - ultimo)) / 60000);
-            return message.reply(`⏳ Você já pegou o daily. Volte em ${Math.floor(minutos / 60)}h ${minutos % 60}min.`);
-        }
-        ultimoDaily.set(chave, agora);
-        alterarMoedas(message.guild.id, message.author.id, 100);
-        return message.reply(`🎁 Você recebeu **100** 💶! Saldo: **${moedasDe(message.guild.id, message.author.id)}**`);
-    },
-
-    transferir: async (message, args) => {
-        const user = message.mentions.users.first();
-        const numero = args.find(a => /^\d+$/.test(a));
-        const valor = numero ? parseInt(numero, 10) : 0;
-        if (!user || valor < 1) return uso(message, "transferir @usuário valor");
-        if (user.bot || user.id === message.author.id) return message.reply("❌ Não dá para transferir para você mesmo nem para bots.");
-        const saldo = moedasDe(message.guild.id, message.author.id);
-        if (saldo < valor) return message.reply(`❌ Saldo insuficiente. Você tem **${saldo}** 💶.`);
-        alterarMoedas(message.guild.id, message.author.id, -valor);
-        alterarMoedas(message.guild.id, user.id, valor);
-        return message.reply(`💸 ${message.author} enviou **${valor}** 💶 para ${user}.`);
-    },
-
-    loja: message => {
-        const itens = lojaDe(message.guild.id);
-        if (!itens.size) return message.reply("🏪 A loja está vazia.");
-        const linhas = [...itens].map(([roleId, preco]) => {
-            const cargo = message.guild.roles.cache.get(roleId);
-            return `${cargo ? cargo.toString() : "(cargo apagado)"} • 💶 ${preco}`;
-        });
-        const embed = new EmbedBuilder()
-            .setTitle("🏪 Loja de cargos")
-            .setDescription(linhas.join("\n"))
-            .setColor(COR)
-            .setFooter({ text: "Use !comprar @cargo para comprar" });
-        return message.reply({ embeds: [embed] });
-    },
-
-    comprar: async message => {
-        const cargo = message.mentions.roles.first();
-        if (!cargo) return uso(message, "comprar @cargo");
-        const preco = lojaDe(message.guild.id).get(cargo.id);
-        if (preco === undefined) return message.reply("❌ Esse cargo não está à venda.");
-        const membro = await message.guild.members.fetch(message.author.id).catch(() => null);
-        if (!membro) return message.reply("❌ Não encontrei você no servidor.");
-        if (membro.roles.cache.has(cargo.id)) return message.reply(`ℹ️ Você já tem o cargo **${cargo.name}**.`);
-        const saldo = moedasDe(message.guild.id, message.author.id);
-        if (saldo < preco) return message.reply(`❌ Faltam **${preco - saldo}** 💶 para comprar **${cargo.name}**.`);
-        try {
-            await membro.roles.add(cargo);
-        } catch {
-            return message.reply("❌ Não consegui dar esse cargo. Confira se o bot pode gerenciar cargos e se o cargo dele está acima desse.");
-        }
-        alterarMoedas(message.guild.id, message.author.id, -preco);
-        return message.reply(`✅ Você comprou **${cargo.name}** por ${preco} 💶!`);
-    },
-
-    addloja: (message, args) => {
-        const cargo = message.mentions.roles.first();
-        const numero = args.find(a => /^\d+$/.test(a));
-        const preco = numero ? parseInt(numero, 10) : 0;
-        if (!cargo || preco < 1) return uso(message, "addloja @cargo preço");
-        lojaDe(message.guild.id).set(cargo.id, preco);
-        return message.reply(`🏪 **${cargo.name}** está à venda por **${preco}** 💶.`);
-    },
-
-    removeloja: message => {
-        const cargo = message.mentions.roles.first();
-        if (!cargo) return uso(message, "removeloja @cargo");
-        if (!lojaDe(message.guild.id).delete(cargo.id)) return message.reply("❌ Esse cargo não está na loja.");
-        return message.reply(`🏪 **${cargo.name}** saiu da loja.`);
-    },
-
-    // ===== Ranking =====
-    rank: (message, args) => {
-        const porMoedas = (args[0] || "").toLowerCase() === "moedas";
-        const fonte = porMoedas ? moedas : mensagensCount;
-        const prefixo = `${message.guild.id}:`;
-        const top = [...fonte]
-            .filter(([chave, valor]) => chave.startsWith(prefixo) && valor > 0)
-            .map(([chave, valor]) => [chave.slice(prefixo.length), valor])
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);
-        if (!top.length) return message.reply("Ainda não tem ninguém no ranking.");
-        const medalhas = ["🥇", "🥈", "🥉"];
-        const linhas = top.map(([userId, valor], i) =>
-            `${medalhas[i] || `**${i + 1}.**`} <@${userId}> • ${porMoedas ? `💶 ${valor}` : `💬 ${valor} msgs`}`
-        );
-        const embed = new EmbedBuilder()
-            .setTitle(porMoedas ? "🏆 Ranking de moedas" : "🏆 Ranking de mensagens")
-            .setDescription(linhas.join("\n"))
-            .setColor(COR);
-        return message.reply({ embeds: [embed] });
-    },
 
     // ===== Cargo automático =====
     autocargo: (message, args) => {
@@ -1175,7 +1031,6 @@ client.on("messageCreate", async message => {
         if (message.author.bot) return;
 
         if (message.guild && await aplicarProtecoes(message)) return;
-        if (message.guild) contarAtividade(message);
 
         if (!message.content.startsWith(PREFIX)) return;
 
